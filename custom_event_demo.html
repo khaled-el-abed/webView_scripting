@@ -1,0 +1,51 @@
+
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Custom event dispatch and listener demo</h2>
+
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1rem;gap:2rem;">
+
+  <button id="fireBtn" style="font-size:15px;padding:12px 32px;letter-spacing:0.04em;">
+    Fire custom event
+  </button>
+
+  <div style="width:100%;max-width:560px;">
+    <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 6px;font-family:var(--font-mono);">console output</p>
+    <div id="console" style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:14px 16px;min-height:120px;font-family:var(--font-mono);font-size:13px;line-height:1.8;overflow-y:auto;max-height:260px;">
+      <span style="color:var(--color-text-tertiary);">// waiting for events…</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const btn = document.getElementById('fireBtn');
+const consoleEl = document.getElementById('console');
+let count = 0;
+let cleared = false;
+
+function log(msg, color) {
+  if (!cleared) { consoleEl.innerHTML = ''; cleared = true; }
+  const line = document.createElement('div');
+  line.style.color = color || 'var(--color-text-primary)';
+  line.textContent = msg;
+  consoleEl.appendChild(line);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+btn.addEventListener('click', () => {
+  count++;
+  const payload = { id: count, timestamp: new Date().toISOString(), source: 'fireBtn' };
+  const event = new CustomEvent('myEvent', { detail: payload, bubbles: true });
+
+  log(`[dispatch]  CustomEvent "myEvent" fired  (click #${count})`, 'var(--color-text-info)');
+  btn.dispatchEvent(event);
+});
+
+document.addEventListener('myEvent', (e) => {
+  log(`[listener]  event.type  → "${e.type}"`, 'var(--color-text-success)');
+  log(`[listener]  event.detail.id        → ${e.detail.id}`, 'var(--color-text-success)');
+  log(`[listener]  event.detail.timestamp → ${e.detail.timestamp}`, 'var(--color-text-success)');
+  log(`[listener]  event.detail.source    → "${e.detail.source}"`, 'var(--color-text-success)');
+  log(`[listener]  event.bubbles          → ${e.bubbles}`, 'var(--color-text-success)');
+  log('', null);
+});
+</script>
