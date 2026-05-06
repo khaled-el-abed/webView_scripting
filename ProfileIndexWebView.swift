@@ -57,7 +57,7 @@ private struct ProfileLocalIndexWebView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
 
-        if let htmlURL = Bundle.module.url(forResource: "index", withExtension: "html") {
+        if let htmlURL = Bundle.module.url(forResource: "custom_event_demo", withExtension: "html") {
             webView.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
         } else {
             webView.loadHTMLString("<h3>index.html not found</h3>", baseURL: nil)
@@ -85,14 +85,29 @@ private struct ProfileLocalIndexWebView: UIViewRepresentable {
             let escapedName = listenerName.replacingOccurrences(of: "'", with: "\\'")
             let source = """
             (function() {
-              document.addEventListener('myEvent', function(e) {
+              function forwardToNative(e) {
                 if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers['\(escapedName)']) {
                   window.webkit.messageHandlers['\(escapedName)'].postMessage({
                     event: e.type,
                     detail: e.detail || null
                   });
                 }
-              });
+              }
+              const interceptedEvents = [
+                'myEvent',
+                'mySecondEvent',
+                'myThirdEvent',
+                'myFourthEvent',
+                'myFifthEvent',
+                'mySixthEvent',
+                'mySeventhEvent',
+                'myEighthEvent',
+                'myNinthEvent',
+                'myTenthEvent'
+              ];
+              for (const eventName of interceptedEvents) {
+                document.addEventListener(eventName, forwardToNative);
+              }
             })();
             """
             return WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
