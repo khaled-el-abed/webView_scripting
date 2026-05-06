@@ -3,9 +3,13 @@
 
 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1rem;gap:2rem;">
 
-  <button id="fireBtn" style="font-size:15px;padding:12px 32px;letter-spacing:0.04em;">
-    Fire custom event
-  </button>
+  <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;">
+    <label for="eventSelect" style="font-size:13px;color:var(--color-text-secondary);">Choose event</label>
+    <select id="eventSelect" style="font-size:15px;padding:10px 12px;border-radius:8px;max-width:100%;"></select>
+    <button id="fireBtn" type="button" style="font-size:15px;padding:12px 32px;letter-spacing:0.04em;">
+      Fire selected event
+    </button>
+  </div>
 
   <div style="width:100%;max-width:560px;">
     <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 6px;font-family:var(--font-mono);">console output</p>
@@ -18,9 +22,34 @@
 
 <script>
 const btn = document.getElementById('fireBtn');
+const select = document.getElementById('eventSelect');
 const consoleEl = document.getElementById('console');
-let count = 0;
 let cleared = false;
+
+const interceptedEvents = [
+  'myEvent',
+  'mySecondEvent',
+  'myThirdEvent',
+  'myFourthEvent',
+  'myFifthEvent',
+  'mySixthEvent',
+  'mySeventhEvent',
+  'myEighthEvent',
+  'myNinthEvent',
+  'myTenthEvent'
+];
+
+const counts = {};
+interceptedEvents.forEach((name) => {
+  counts[name] = 0;
+});
+
+for (const name of interceptedEvents) {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  select.appendChild(opt);
+}
 
 function log(msg, color) {
   if (!cleared) { consoleEl.innerHTML = ''; cleared = true; }
@@ -32,20 +61,31 @@ function log(msg, color) {
 }
 
 btn.addEventListener('click', () => {
-  count++;
-  const payload = { id: count, timestamp: new Date().toISOString(), source: 'fireBtn' };
-  const event = new CustomEvent('myEvent', { detail: payload, bubbles: true });
+  const eventType = select.value;
+  counts[eventType]++;
+  const payload = {
+    id: counts[eventType],
+    timestamp: new Date().toISOString(),
+    source: 'dropdown',
+    eventType: eventType
+  };
+  const event = new CustomEvent(eventType, { detail: payload, bubbles: true });
 
-  log(`[dispatch]  CustomEvent "myEvent" fired  (click #${count})`, 'var(--color-text-info)');
+  log(`[dispatch]  CustomEvent "${eventType}" fired  (click #${counts[eventType]})`, 'var(--color-text-info)');
   btn.dispatchEvent(event);
 });
 
-document.addEventListener('myEvent', (e) => {
+function logEvent(e) {
   log(`[listener]  event.type  → "${e.type}"`, 'var(--color-text-success)');
   log(`[listener]  event.detail.id        → ${e.detail.id}`, 'var(--color-text-success)');
   log(`[listener]  event.detail.timestamp → ${e.detail.timestamp}`, 'var(--color-text-success)');
   log(`[listener]  event.detail.source    → "${e.detail.source}"`, 'var(--color-text-success)');
+  log(`[listener]  event.detail.eventType → "${e.detail.eventType}"`, 'var(--color-text-success)');
   log(`[listener]  event.bubbles          → ${e.bubbles}`, 'var(--color-text-success)');
   log('', null);
-});
+}
+
+for (const eventName of interceptedEvents) {
+  document.addEventListener(eventName, logEvent);
+}
 </script>
