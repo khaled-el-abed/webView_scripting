@@ -76,6 +76,7 @@ btn.addEventListener('click', () => {
 });
 
 function logEvent(e) {
+    console.log(e)
   log(`[listener]  event.type  → "${e.type}"`, 'var(--color-text-success)');
   log(`[listener]  event.detail.id        → ${e.detail.id}`, 'var(--color-text-success)');
   log(`[listener]  event.detail.timestamp → ${e.detail.timestamp}`, 'var(--color-text-success)');
