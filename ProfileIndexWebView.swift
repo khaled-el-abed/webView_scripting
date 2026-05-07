@@ -114,3 +114,37 @@ private struct ProfileLocalIndexWebView: UIViewRepresentable {
         }
     }
 }
+
+
+let spyScript = """
+// Spy on postMessage
+const _origPostMessage = window.postMessage.bind(window);
+window.postMessage = function(data, origin) {
+    window.webkit.messageHandlers.quickSignBridge.postMessage({
+        type: "postMessage",
+        data: JSON.stringify(data)
+    });
+    return _origPostMessage(data, origin);
+};
+
+// Spy on ALL custom events
+const _origDispatch = EventTarget.prototype.dispatchEvent;
+EventTarget.prototype.dispatchEvent = function(event) {
+    if (event.type !== 'click' && event.type !== 'mousemove') { // filter noise
+        window.webkit.messageHandlers.quickSignBridge.postMessage({
+            type: "domEvent",
+            eventType: event.type,
+            detail: JSON.stringify(event.detail ?? null)
+        });
+    }
+    return _origDispatch.call(this, event);
+};
+"""
+
+let userScript = WKUserScript(
+    source: spyScript,
+    injectionTime: .atDocumentStart, // must be early
+    forMainFrameOnly: false // false catches iframes too
+)
+config.userContentController.addUserScript(userScript)
+config.userContentController.add(weakHandler, name: "quickSignBridge")
