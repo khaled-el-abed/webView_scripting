@@ -148,3 +148,19 @@ let userScript = WKUserScript(
 )
 config.userContentController.addUserScript(userScript)
 config.userContentController.add(weakHandler, name: "quickSignBridge")
+
+// 1. The weak proxy class — prevents retain cycle
+class WeakScriptHandler: NSObject, WKScriptMessageHandler {
+    weak var delegate: WKScriptMessageHandler?
+
+    init(delegate: WKScriptMessageHandler) {
+        self.delegate = delegate
+    }
+
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        delegate?.userContentController(userContentController, didReceive: message)
+    }
+}
