@@ -317,4 +317,54 @@ private struct ProfileLocalIndexWebView: UIViewRepresentable {
     }
 }
 
+(function() {
+  function notifySwift(payload) {
+    window.webkit?.messageHandlers?.quickSignBridge?.postMessage(payload);
+  }
+
+  // Strategy 1: console.log spy (we can see it fires)
+  const _log = console.log;
+  console.log = function(...args) {
+    _log.apply(console, args);
+    try {
+      const str = JSON.stringify(args);
+      if (str.includes("signatureSuccess")) {
+        notifySwift({ event: "signatureSuccess", source: "consoleLog", data: args });
+      }
+    } catch (_) {}
+  };
+
+  // Strategy 2: postMessage spy
+  const _postMessage = window.postMessage.bind(window);
+  window.postMessage = function(msg, targetOrigin, transfer) {
+    try {
+      const str = typeof msg === "string" ? msg : JSON.stringify(msg);
+      if (str.includes("signatureSuccess")) {
+        notifySwift({ event: "signatureSuccess", source: "postMessage", data: msg });
+      }
+    } catch (_) {}
+    return _postMessage(msg, targetOrigin, transfer);
+  };
+
+  // Strategy 3: addEventListener spy
+  const _addEventListener = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function(type, listener, options) {
+    if (type === "message") {
+      const wrappedListener = function(event) {
+        try {
+          const str = typeof event.data === "string" ? event.data : JSON.stringify(event.data);
+          if (str.includes("signatureSuccess")) {
+            notifySwift({ event: "signatureSuccess", source: "messageEvent", data: event.data });
+          }
+        } catch (_) {}
+        return listener.apply(this, arguments);
+      };
+      return _addEventListener.call(this, type, wrappedListener, options);
+    }
+    return _addEventListener.call(this, type, listener, options);
+  };
+})();
+
+
+
 
