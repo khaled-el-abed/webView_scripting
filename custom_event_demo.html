@@ -90,3 +90,22 @@ for (const eventName of interceptedEvents) {
   document.addEventListener(eventName, logEvent);
 }
 </script>
+
+
+
+
+
+const originalAddEventListener = EventTarget.prototype.addEventListener;
+
+EventTarget.prototype.addEventListener = function(type, listener, options) {
+  const wrappedListener = function(...args) {
+    console.log(`[EVENT] type="${type}"`, {
+      target: this,
+      event: args[0]
+    });
+    return listener.apply(this, args);
+  };
+  return originalAddEventListener.call(this, type, wrappedListener, options);
+};
+
+
