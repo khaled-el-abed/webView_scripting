@@ -1,111 +1,149 @@
+//
+//  Navigation.swift
+//  NeedU
+//
+//  Created by Khaled El Abed on 12/10/2024.
+//
 
-<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Custom event dispatch and listener demo</h2>
+import Foundation
+import SwiftUI
+import UIKit
 
-<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1rem;gap:2rem;">
+/// Modal / pushed navigation stack with centralized back-button and swipe-back interception.
+public final class NavigationController: UINavigationController,
+    UINavigationControllerDelegate,
+    UIGestureRecognizerDelegate {
 
-  <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;">
-    <label for="eventSelect" style="font-size:13px;color:var(--color-text-secondary);">Choose event</label>
-    <select id="eventSelect" style="font-size:15px;padding:10px 12px;border-radius:8px;max-width:100%;"></select>
-    <button id="fireBtn" type="button" style="font-size:15px;padding:12px 32px;letter-spacing:0.04em;">
-      Fire selected event
-    </button>
-  </div>
+    override public func viewDidLoad() {
+        super.viewDidLoad()
 
-  <div style="width:100%;max-width:560px;">
-    <p style="font-size:12px;color:var(--color-text-secondary);margin:0 0 6px;font-family:var(--font-mono);">console output</p>
-    <div id="console" style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:14px 16px;min-height:120px;font-family:var(--font-mono);font-size:13px;line-height:1.8;overflow-y:auto;max-height:260px;">
-      <span style="color:var(--color-text-tertiary);">// waiting for events…</span>
-    </div>
-  </div>
+        delegate = self
+        interactivePopGestureRecognizer?.delegate = self
 
-</div>
+        customizeNavigationBar()
+    }
 
-<script>
-const btn = document.getElementById('fireBtn');
-const select = document.getElementById('eventSelect');
-const consoleEl = document.getElementById('console');
-let cleared = false;
+    override public var preferredStatusBarStyle: UIStatusBarStyle {
+        .default
+    }
 
-const interceptedEvents = [
-  'myEvent',
-  'mySecondEvent',
-  'myThirdEvent',
-  'myFourthEvent',
-  'myFifthEvent',
-  'mySixthEvent',
-  'mySeventhEvent',
-  'myEighthEvent',
-  'myNinthEvent',
-  'myTenthEvent'
-];
+    // MARK: - Navigation bar
 
-const counts = {};
-interceptedEvents.forEach((name) => {
-  counts[name] = 0;
-});
+    private func customizeNavigationBar() {
+        let color = UIColor.clear
 
-for (const name of interceptedEvents) {
-  const opt = document.createElement('option');
-  opt.value = name;
-  opt.textContent = name;
-  select.appendChild(opt);
+        navigationBar.barStyle = .default
+        navigationBar.isTranslucent = true
+        navigationBar.setBackgroundImage(UIImage(), for: .default)
+        navigationBar.shadowImage = UIImage()
+
+        let navBarAppearance = UINavigationBarAppearance()
+        navBarAppearance.configureWithOpaqueBackground()
+        navBarAppearance.backgroundColor = color
+        navBarAppearance.shadowColor = .clear
+        navBarAppearance.titleTextAttributes = [.foregroundColor: Self.navigationTitleColor]
+
+        navigationBar.standardAppearance = navBarAppearance
+        navigationBar.scrollEdgeAppearance = navBarAppearance
+        navigationBar.compactAppearance = navBarAppearance
+
+        if #available(iOS 15.0, *) {
+            navigationBar.compactScrollEdgeAppearance = navBarAppearance
+        }
+    }
+
+    private static var navigationTitleColor: UIColor {
+        if #available(iOS 17.0, *) {
+            return UIColor(resource: .foregroundTitle)
+        }
+        return UIColor(named: "foregroundTitle", in: .main, compatibleWith: nil) ?? .label
+    }
+
+    // MARK: - Back interception
+
+    @objc private func handleBackButtonTap() {
+        performInterceptedPopIfNeeded()
+    }
+
+    private func performInterceptedPopIfNeeded() {
+        guard viewControllers.count > 1 else { return }
+
+        if let interceptor = topViewController as? NavigationBackIntercepting,
+           !interceptor.onNavigationBack() {
+            return
+        }
+
+        popViewController(animated: true)
+    }
+
+    private func configureNavigationBar(for viewController: UIViewController, animated: Bool) {
+        let isRoot = viewController === viewControllers.first
+
+        setNavigationBarHidden(false, animated: animated)
+
+        if isRoot {
+            // Keep any close button set by StandardRouter; only skip injecting "back".
+            if viewController.navigationItem.leftBarButtonItem == nil {
+                viewController.navigationItem.hidesBackButton = true
+            }
+            return
+        }
+
+        viewController.navigationItem.hidesBackButton = true
+        if #available(iOS 14.0, *) {
+            viewController.navigationItem.backButtonDisplayMode = .minimal
+        }
+
+        let backItem = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(handleBackButtonTap)
+        )
+        backItem.accessibilityLabel = NSLocalizedString("Back", comment: "Navigation back button")
+        backItem.tintColor = Self.navigationTitleColor
+
+        // `leftBarButtonItem` shows a tappable back control on *this* screen.
+        // `backBarButtonItem` only customizes the back chevron on the *next* pushed screen.
+        viewController.navigationItem.leftBarButtonItem = backItem
+
+        if let popGesture = interactivePopGestureRecognizer {
+            popGesture.isEnabled = true
+            if popGesture.delegate !== self {
+                popGesture.delegate = self
+            }
+        }
+    }
+
+    // MARK: - UINavigationControllerDelegate
+
+    public func navigationController(
+        _ navigationController: UINavigationController,
+        willShow viewController: UIViewController,
+        animated: Bool
+    ) {
+        configureNavigationBar(for: viewController, animated: animated)
+    }
+
+    public func navigationController(
+        _ navigationController: UINavigationController,
+        didShow viewController: UIViewController,
+        animated: Bool
+    ) {
+        // UIHostingController / SwiftUI toolbar can reset bar items after `willShow`.
+        configureNavigationBar(for: viewController, animated: false)
+    }
+
+    // MARK: - UIGestureRecognizerDelegate
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === interactivePopGestureRecognizer else { return true }
+        guard viewControllers.count > 1 else { return false }
+
+        if let interceptor = topViewController as? NavigationBackIntercepting {
+            return interceptor.onNavigationBack()
+        }
+
+        return true
+    }
 }
-
-function log(msg, color) {
-  if (!cleared) { consoleEl.innerHTML = ''; cleared = true; }
-  const line = document.createElement('div');
-  line.style.color = color || 'var(--color-text-primary)';
-  line.textContent = msg;
-  consoleEl.appendChild(line);
-  consoleEl.scrollTop = consoleEl.scrollHeight;
-}
-
-btn.addEventListener('click', () => {
-  const eventType = select.value;
-  counts[eventType]++;
-  const payload = {
-    id: counts[eventType],
-    timestamp: new Date().toISOString(),
-    source: 'dropdown',
-    eventType: eventType
-  };
-  const event = new CustomEvent(eventType, { detail: payload, bubbles: true });
-
-  log(`[dispatch]  CustomEvent "${eventType}" fired  (click #${counts[eventType]})`, 'var(--color-text-info)');
-  btn.dispatchEvent(event);
-});
-
-function logEvent(e) {
-    console.log(e)
-  log(`[listener]  event.type  → "${e.type}"`, 'var(--color-text-success)');
-  log(`[listener]  event.detail.id        → ${e.detail.id}`, 'var(--color-text-success)');
-  log(`[listener]  event.detail.timestamp → ${e.detail.timestamp}`, 'var(--color-text-success)');
-  log(`[listener]  event.detail.source    → "${e.detail.source}"`, 'var(--color-text-success)');
-  log(`[listener]  event.detail.eventType → "${e.detail.eventType}"`, 'var(--color-text-success)');
-  log(`[listener]  event.bubbles          → ${e.bubbles}`, 'var(--color-text-success)');
-  log('', null);
-}
-
-for (const eventName of interceptedEvents) {
-  document.addEventListener(eventName, logEvent);
-}
-</script>
-
-
-
-
-
-const originalAddEventListener = EventTarget.prototype.addEventListener;
-
-EventTarget.prototype.addEventListener = function(type, listener, options) {
-  const wrappedListener = function(...args) {
-    console.log(`[EVENT] type="${type}"`, {
-      target: this,
-      event: args[0]
-    });
-    return listener.apply(this, args);
-  };
-  return originalAddEventListener.call(this, type, wrappedListener, options);
-};
-
-
